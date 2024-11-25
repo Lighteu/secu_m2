@@ -237,25 +237,25 @@ def roundq(q, x):
 def generate_random_polynomial(q, n):
     return [ randint(0, q-1) for _ in range(n) ]
 
-def generate_random_small_polynomial(n, eyda):
-    return [ randint(-eyda, eyda) for _ in range(n) ]
+def generate_random_small_polynomial(n, eta):
+    return [ randint(-eta, eta) for _ in range(n) ]
     
 def generate_A(q, k, n):
     return [[generate_random_polynomial(q,n) for _ in range(k)] for _ in range(k)]
     
 
-def generate_small_polynomial_vector(k, n, eyda1):
-    return [ generate_random_small_polynomial(n=n, eyda=eyda1) for _ in range(k) ]
+def generate_small_polynomial_vector(k, n, eta1):
+    return [ generate_random_small_polynomial(n=n, eta=eta1) for _ in range(k) ]
 
 def gen_keys():
     q = 3329
     n = 256
     k = 3
-    eyda1 = 2
-    eyda2 = 2
+    eta1 = 2
+    eta2 = 2
     A = generate_A(q=q,k=k, n=n)
-    s = [ generate_random_small_polynomial(n=n, eyda=eyda1) for _ in range(k) ]
-    e = [ generate_random_small_polynomial(n=n, eyda=eyda2) for _ in range(k) ]
+    s = [ generate_random_small_polynomial(n=n, eta=eta1) for _ in range(k) ]
+    e = [ generate_random_small_polynomial(n=n, eta=eta2) for _ in range(k) ]
     t = add_vector_to_vector(multiply_matrix_by_vector(A, s, q), e, q)
     return ((A,t), s)
 
@@ -263,14 +263,14 @@ def encrypt(m, pub):
     q = 3329
     n = 256
     k = 3
-    eyda1 = 2
-    eyda2 = 2
+    eta1 = 2
+    eta2 = 2
     A = pub[0]
     t = pub[1]
     
-    r = generate_small_polynomial_vector(k,n,eyda1)
-    e1 = generate_small_polynomial_vector(k,n,eyda2)
-    e2 = generate_random_small_polynomial(n,eyda2)
+    r = generate_small_polynomial_vector(k,n,eta1)
+    e1 = generate_small_polynomial_vector(k,n,eta2)
+    e2 = generate_random_small_polynomial(n,eta2)
     u = add_vector_to_vector(multiply_matrix_by_vector(transpose_matrix(A), r,q) ,e1, q)
     t_transpose = transpose_vector_of_polynomials(t)
     t_transpose_times_r = multiply_vector_by_vector(t_transpose, r, q)
@@ -328,7 +328,8 @@ def demonstration():
     cipher = encrypt(binary_message, pub)
     decrypted_binary = decrypt(cipher, prv)
     decrypted_message = binary_vector_to_string(decrypted_binary)
-    print(message == decrypted_message)
+    print(message)
+    print(decrypted_message)
 
 
 
