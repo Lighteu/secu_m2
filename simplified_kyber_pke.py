@@ -60,20 +60,23 @@ def string_to_binary_vector(s):
 def binary_vector_to_string(binary_vector):
     """
     Transforms a binary vector of 1s and 0s back into a string, supporting Unicode characters.
+    If a character cannot be decoded, it is replaced with '*'.
 
     :param binary_vector: The input binary vector (list of 1s and 0s)
-    :return: The original string
+    :return: The reconstructed string
     """
     if len(binary_vector) % 8 != 0:
         raise ValueError("Binary vector length must be a multiple of 8.")
 
-    # Convert the binary vector back to bytes
-    byte_array = bytearray(
-        int(''.join(map(str, binary_vector[i:i+8])), 2)
-        for i in range(0, len(binary_vector), 8)
-    )
-    # Decode the byte array as a UTF-8 string
-    return byte_array.decode('utf-8')
+    result = []
+    for i in range(0, len(binary_vector), 8):
+        try:
+            byte = int(''.join(map(str, binary_vector[i:i+8])), 2)
+            result.append(chr(byte))
+        except Exception:
+            result.append('*')
+    
+    return ''.join(result)
 
 def transpose_matrix(matrix):
     """
@@ -108,18 +111,13 @@ def transpose_vector_of_polynomials(vector):
 
 def polynomial_multiplication(P, Q, q):
     n = len(P)
-    result = [0] * (n*2-1)
-    
+    result = [0] * n
     for i in range(n):
         for j in range(n):
-            
-            index = i + j
-            result[index] += (P[i] * Q[j]) % q
-    for i in range(n, len(result)) :
-        result[i-n] -= result[i]
-    for i in range(len(result)) :
-        result[i] %= q
-    return result[:n]
+            index = (i + j) % n
+            sign = -1 if (i + j) >= n else 1
+            result[index] = (result[index] + sign * P[i] * Q[j]) % q
+    return result
 
 def polynomial_addition(P, Q, q):
     result = []
@@ -214,18 +212,10 @@ def add_vector_to_vector(V1, V2, q) :
     return result
     
 def mods(q, x):
-    if q % 2 != 0:
-        r = x % q
-        if r <= ( q - 1 ) // 2:
-            return r
-        else :
-            return r - q
-    else :
-        r = x % q
-        if r <= q // 2:
-            return r
-        else:
-            return r - q
+    r = x % q
+    if r > (q - 1) // 2:
+        r -= q
+    return r
         
 
 def size_of_integer(q, x):
@@ -240,11 +230,9 @@ def size_of_polynomial(q, V):
             
     return result
 
-def roundq(q, x) :
-    if x > -q // 4 and x < q // 4:
-        return 0
-    else :
-        return 1
+def roundq(q, x):
+    x = x % q
+    return 1 if x > q // 4 and x < 3 * q // 4 else 0
     
 def generate_random_polynomial(q, n):
     return [ randint(0, q-1) for _ in range(n) ]
@@ -261,21 +249,20 @@ def generate_small_polynomial_vector(k, n, eyda1):
 
 def gen_keys():
     q = 3329
-    n = 4
-    k = 2
+    n = 256
+    k = 3
     eyda1 = 2
     eyda2 = 2
     A = generate_A(q=q,k=k, n=n)
     s = [ generate_random_small_polynomial(n=n, eyda=eyda1) for _ in range(k) ]
     e = [ generate_random_small_polynomial(n=n, eyda=eyda2) for _ in range(k) ]
     t = add_vector_to_vector(multiply_matrix_by_vector(A, s, q), e, q)
-    visualize_polynomial_matrix(A)
     return ((A,t), s)
 
 def encrypt(m, pub):
     q = 3329
-    n = 4
-    k = 2
+    n = 256
+    k = 3
     eyda1 = 2
     eyda2 = 2
     A = pub[0]
@@ -300,8 +287,8 @@ def decrypt(cipher, prv) :
     s_transpose_times_u = multiply_vector_by_vector(s_transpose, u, q)
     v_minus_s_transpose_times_u = polynomial_subtraction(v, s_transpose_times_u, q)
     result = []
-    for reeiur in v_minus_s_transpose_times_u:
-        result.append(roundq(q, reeiur))
+    for element in v_minus_s_transpose_times_u:
+        result.append(roundq(q, element))
         
     return result
 
@@ -319,8 +306,7 @@ def compute_v(t_r_e2, message, q):
         list: Coefficients of the polynomial v mod q.
     """
     # Compute the scaling factor
-    # FIXME: this should be round(q/2) to be checked later
-    scale = round(q / 2)
+    scale = round(q/2)
 
     # Extend the shorter list to match the longer one
     max_len = max(len(t_r_e2), len(message))
@@ -334,67 +320,17 @@ def compute_v(t_r_e2, message, q):
     v = [(t_r_e2[i] + scaled_message[i]) % q for i in range(max_len)]
     
     return v
-def test_encrypt() :
-    # key creation
-    A = [
-        [[21,57,78,43], [126,122,19,125]],
-        [[111,9,63,33], [105,61,71,64]]
-    ]
-    s = [[1,2,-1,2], [0,-1,0,2]]
-    e = [[1,0,-1,1], [0,-1,1,0]]
-    q = 137
-    t = add_vector_to_vector(multiply_matrix_by_vector(A, s, q), e, q)
-    
-    # message encryption
-    r = [[-2,2,1,-1],  [-1,1,1,0]]
-    e1 = [[1,0,-2,1], [-1,2,-2,1]]
-    e2 = [2,2,-1,1]
-    u = add_vector_to_vector(multiply_matrix_by_vector(transpose_matrix(A), r,q) ,e1, q)
-    t_transpose = transpose_vector_of_polynomials(t)
-    t_transpose_times_r = multiply_vector_by_vector(t_transpose, r, q)
-    t_transpose_times_r_plus_e2 = polynomial_addition(t_transpose_times_r, e2, q)
-    v = compute_v(t_transpose_times_r_plus_e2, [1,1,1,1], q)
-    ic(v)
-    # message decryption
-    s_transpose = transpose_vector_of_polynomials(s)
-    s_transpose_times_u = multiply_vector_by_vector(s_transpose, u, q)
-    v_minus_s_transpose_times_u = polynomial_subtraction(v, s_transpose_times_u, q)
-    ic(v_minus_s_transpose_times_u)
-    for reeiur in v_minus_s_transpose_times_u:
-        print(roundq(q, reeiur))
 
 def demonstration():
     pub, prv = gen_keys()
-    cipher = encrypt(string_to_binary_vector('hello world!'), pub)
-    print(binary_vector_to_string(decrypt(cipher, prv)))
+    message = "Hello world!"
+    binary_message = string_to_binary_vector(message)
+    cipher = encrypt(binary_message, pub)
+    decrypted_binary = decrypt(cipher, prv)
+    decrypted_message = binary_vector_to_string(decrypted_binary)
+    print(message == decrypted_message)
+
+
+
 
 demonstration()
-exit()
-m = string_to_binary_vector('Hello world!')
-pub, prv = gen_keys()
-encrypt(m,pub)
-exit()
-
-A = [
-    [[21,57,78,43], [126,122,19,125]],
-    [[111,9,63,33], [105,61,71,64]]
-]
-
-s = [[1,2,-1,2], [0,-1,0,2]]
-
-e = [[1,0,-1,1], [0,-1,1,0]]
-
-q = 137
-
-
-P = multiply_matrix_by_vector(A, s, q)
-# Compute C = P + e mod q
-C = add_vector_to_vector(P, e, q)
-
-print("Result of A * s modulo q:")
-for i, poly in enumerate(P):
-    print(f"{poly}")
-
-print("\nResult of (A * s) + e modulo q:")
-for i, poly in enumerate(C):
-    print(f"{poly}")
