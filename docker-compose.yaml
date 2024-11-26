@@ -1,0 +1,9 @@
+version: '3.8'
+
+services:
+  manim:
+    image: manimcommunity/manim:stable
+    volumes:
+      - .:/manim
+    working_dir: /manim
+    command: manim -ql lattice_grid.py LatticeGrid
