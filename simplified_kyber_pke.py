@@ -153,7 +153,6 @@ def polynomial_subtraction(P, Q, q):
 def multiply_matrix_by_vector(A, V, q):
     # Initialize result as a vector of zero polynomials
     result = [[0] * len(A[0][0]) for _ in range(len(A))]
-    
     for i in range(len(A)):  # Iterate over rows of A
         for k in range(len(V)):  # Iterate over entries in V
             # Multiply the polynomial in A[i][k] with the polynomial in V[k]
@@ -332,6 +331,5 @@ def demonstration():
     print(decrypted_message)
 
 
-
-
-demonstration()
+if __name__ == "__main__":
+    demonstration()
