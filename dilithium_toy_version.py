@@ -4,6 +4,8 @@ from simplified_kyber_pke import generate_random_polynomial, visualize_polynomia
 import random
 import numpy as np
 
+
+n = 256, q = 2**14, eta=2
 def generate_A(q, k, l, n):
     return [[generate_random_polynomial(q,n) for _ in range(l)] for _ in range(k)]
 
@@ -18,7 +20,7 @@ def generate_random_polynomial_with_bound(n, bound):
 def generate_y_vector(gamma1, l, n):
     """
     Generates a vector y of length l, where each entry is a polynomial 
-    with coefficients in [-gamma1, gamma1-1].
+    with coefficients in [-gamma1+1, gamma1].
     """
     return [generate_random_polynomial_with_bound(n, gamma1) for _ in range(l)]
 
@@ -187,7 +189,7 @@ def generate_keys():
     # Creating our A matrix, containing polynomials that are randomly created 
     k = 4
     l = 3
-    global n, q, eta, gamma2
+    
     n = 256
     q = 2**14
     eta = 2
