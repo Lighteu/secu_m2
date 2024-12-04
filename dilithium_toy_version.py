@@ -286,7 +286,7 @@ def verify_signature(message, signature, A_matrix, t, q, bit_count=1026):
     
 
 
-
-public_k,private_k = generate_keys()
-message_signature = generate_signature("hi", public_k[0], private_k[0], private_k[1], public_k[1], gamma=1026)
-signature_verif = verify_signature("hi", message_signature, public_k[0], public_k[1], q)
+if __name__ == "__main__":
+    public_k,private_k = generate_keys()
+    message_signature = generate_signature("hi", public_k[0], private_k[0], private_k[1], public_k[1], gamma=1026)
+    signature_verif = verify_signature("hi", message_signature, public_k[0], public_k[1], q)
