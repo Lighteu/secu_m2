@@ -38,20 +38,20 @@ def generate_matrix_A(k, n, q, seed):
     return matrix
 
 
-def compress_coefficients(coefficients, q, k):
+def compress_coefficients(coefficients, q, d):
     compressed = []
     for coeff in coefficients:
-        # Scale down the coefficient to the range [0, 2^k)
-        compressed_coeff = round((coeff * (2**k)) / q) % (2**k)
+        # Scale down the coefficient to the range [0, 2^d)
+        compressed_coeff = round(coeff * ((2**d) / q)) % (2**d)
         compressed.append(compressed_coeff)
     return compressed
 
 
-def decompress_coefficients(compressed, q, k):
+def decompress_coefficients(compressed, q, d):
     decompressed = []
     for compressed_coeff in compressed:
         # Scale back the coefficient to the range [0, q)
-        decompressed_coeff = round((compressed_coeff * q) / (2**k)) % q
+        decompressed_coeff = round(compressed_coeff * (q / (2**d))) % q
         decompressed.append(decompressed_coeff)
     return decompressed
 
