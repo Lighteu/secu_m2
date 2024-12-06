@@ -5,7 +5,10 @@ import random
 import numpy as np
 
 
-n = 256; q = 2**14; eta=2
+n = 256
+q = 2**14 
+eta=2
+
 def generate_A(q, k, l, n):
     return [[generate_random_polynomial(q,n) for _ in range(l)] for _ in range(k)]
 

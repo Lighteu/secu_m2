@@ -3,15 +3,16 @@ from dilithium_toy_version import *
 from hashlib import shake_256
 import secrets
 
-n = 256
+
+n = 4
 q = 2**14
 lambda_p = 256
-k = 4
-l = 3
-gamma1 = 2**19
-gamma2 = 2**18
-tau = 60
-eta = 2
+k = 3
+l = 2
+gamma1 = 2**10
+gamma2 = 513
+tau = 4
+eta = 10
 Beta = tau*eta
 
 def generate_xi():
@@ -84,25 +85,36 @@ def expandA(q, k, l, n, p: bytes):
     A = []
     counter = 0
     for i in range(k):
-        row = []
-        for j in range(l):
-            poly = sample_uniform_polynomial(q, n, p, counter)
-            row.append(poly)
-            counter += 1
-        A.append(row)
-    return A
+        # Derive a unique seed for each polynomial in the vector
+        vector.append(generate_random_small_polynomial(n, eta, seed))
+    return vector
+
 
 def expandS(k, l, n, eta, p_prime: bytes):
     """
     Expand p_prime into two secret vectors s1 and s2.
-    s1: l polynomials, s2: k polynomials.
+    
+    Parameters:
+    - k: Dimension of s2 (vector length).
+    - l: Dimension of s1 (vector length).
+    - n: Degree of polynomials in the vectors.
+    - eta: Range for polynomial coefficients.
+    - p_prime: Seed to derive s1 and s2.
+    
+    Returns:
+    - s1: Vector of l small polynomials.
+    - s2: Vector of k small polynomials.
     """
-    s1 = []
-    for i in range(l):
-        s1.append(sample_small_polynomial(n, eta, p_prime, i))
-    s2 = []
-    for j in range(k):
-        s2.append(sample_small_polynomial(n, eta, p_prime, l + j))
+    # Convert p_prime (integer) to bytes (let's assume 4 bytes for this example)
+    p_prime_bytes = p_prime.to_bytes((p_prime.bit_length() + 7) // 8, byteorder='big')
+
+    # Derive two seeds from p_prime for generating s1 and s2
+    seed_s1 = hash(p_prime_bytes + "s1".encode('utf-8'),256) & 0xFFFFFFFF
+    seed_s2 = hash(p_prime_bytes + "s2".encode('utf-8'),512) & 0xFFFFFFFF
+    
+    # Generate s1 and s2
+    s1 = generate_small_polynomial_vector(l, n, eta, seed_s1)
+    s2 = generate_small_polynomial_vector(k, n, eta, seed_s2)
     return s1, s2
 
 def compute_t_vector(A_matrix, s1_vector, s2_vector, q):
@@ -115,33 +127,62 @@ def compute_t_vector(A_matrix, s1_vector, s2_vector, q):
 
 def compute_tr(p_seed: bytes, t_vector, parameter_lambda):
     """
-    tr = H(p_seed || t_vector, 2*lambda)
-    Serialize t_vector and hash.
+    Compute μ = H(tr || M, 512), where H is SHAKE-256.
+    
+    Parameters:
+    - tr: Trace value (bytes).
+    - message: Message to be signed (bytes).
+    
+    Returns:
+    - μ: 512-bit hash output as bytes.
     """
-    # Serialize t_vector coefficients as unsigned
-    t_bytes = b"".join(
-        (coeff % q).to_bytes(2, 'big', signed=False)  
-        for poly in t_vector for coeff in poly
-    )
-    concatenated = p_seed + t_bytes
-    # produce a 2*lambda = 512 bits hash if lambda=256
-    tr = shake_256(concatenated).digest((2 * parameter_lambda) // 8)
-    return tr
-
-def compute_mu(tr: bytes, message: bytes):
-    """
-    mu = H(tr || M, 512 bits)
-    """
-    concatenated = tr + message
-    mu = shake_256(concatenated).digest(64)  # 512 bits
+    # Concatenate the trace and the message
+    byte_message = message.encode('utf-8')
+    concatenated = tr + byte_message
+    
+    # Hash using SHAKE-256 to produce a 512-bit output
+    mu = shake_256(concatenated).digest(512 // 8)  # 512 bits = 64 bytes
+    
     return mu
 
-def compute_p_prime_prime(K: bytes, rnd: bytes, mu: bytes):
+def compute_tr(p_seed, t_vector, parameter_lambda):
+    """
+    Compute the trace vector tr, composed of the concatenation of p_seed (rho) and the t_vector, producing a trace of length 2 times lambda.
+    
+    Parameters:
+    - p_seed: The generated rho seed.
+    - t_vector: Public vector t.
+    - parameter_lambda: Lambda value used to produce tr of length 2*lambda.
+    
+    Returns:
+    - tr: Concatenation of rho and the t vector of length 2*lambda.
+    """
+    # Step 1: Serialize the t_vector into a byte string
+    t_bytes = b"".join(int.to_bytes(coeff, length=4, byteorder="big", signed=True) 
+                       for poly in t_vector for coeff in poly)
+    
+    # Converting p_seed (integer) to bytes (let's assume 4 bytes for this example)
+    # Step 2: Concatenate p_seed and the serialized t_vector bytes
+    p_bytes = p_seed.to_bytes((p_seed.bit_length() + 7) // 8, byteorder='big')
+
+    concatenated = p_bytes + t_bytes
+    
+    # Step 3: Hash the concatenated value to derive tr
+    hash_output = shake_256(concatenated).digest((2 * parameter_lambda) // 8)
+    
+    return hash_output
+
+def compute_p_prime_prime(K, rnd, mu):
     """
     p'' = H(K || rnd || mu, 512 bits)
     """
-    concatenated = K + rnd + mu
-    p_prime_prime = shake_256(concatenated).digest(64)  # 512 bits
+    # Concatenate K, rnd, and μ
+    K_bytes = K.to_bytes(256 // 8, byteorder='big')
+    concatenated = K_bytes + rnd + mu
+    
+    # Hash using SHAKE-256 to produce a 512-bit output
+    p_prime_prime = shake_256(concatenated).digest(512 // 8)  # 512 bits = 64 bytes
+    
     return p_prime_prime
 
 def generate_deterministic_rnd():
@@ -155,11 +196,183 @@ def expand_mask_with_nonce(seed: bytes, kappa, l, gamma1):
     stream = shake_256(input_data)
     y = []
     for _ in range(l):
-        rand_bytes = stream.digest(4)
-        rand_int = int.from_bytes(rand_bytes, 'big')
-        mapped_int = (rand_int % (2 * gamma1 + 1)) - gamma1 - 1
-        y.append(mapped_int)
+        polynomial = []
+        for _ in range(n):
+            rand_bytes = shake.digest(4)  # 4 bytes (32 bits) for each value
+            shake.update(rand_bytes)  # Update with new randomness for the next coefficient
+            
+            rand_int = int.from_bytes(rand_bytes, byteorder='big')
+            mapped_int = (rand_int % (2 * gamma1 + 1)) - gamma1 - 1  # Mapping to range [-gamma1, gamma1]
+            
+            polynomial.append(mapped_int)
+        
+        y.append(polynomial)
+    
     return y
+
+def decompose(r, a, q):
+    """
+    Decompose r into (r1, r0) such that r = r1 * a + r0,
+    with -a/2 < r0 ≤ a/2 and 0 ≤ r1 ≤ m.
+
+    Parameters:
+        r (int): Input integer, 0 <= r < q.
+        a (int): Even divisor of q - 1.
+        q (int): Modulus.
+
+    Returns:
+        tuple: (r1, r0) decomposition.
+    """
+    # Step 1: Compute r0 as the remainder of r modulo a, adjusted to [-a/2, a/2]
+    r0 = r % a
+    if r0 > a // 2:
+        r0 -= a  # Center r0 around 0 (-a/2 < r0 <= a/2)
+
+    # Step 2: Compute r1 as the quotient
+    r1 = (r - r0) // a
+    # Step 3: Return the decomposition
+    return r1, r0
+
+def compute_w1(w):
+    result = [[0] * len(w[0]) for _ in range(len(w))]
+    for i in range(len(w)):
+        for j in range(len(w[0])):
+            w_highbits,_ = decompose(w[i][j], 2*gamma2,q)
+            result[i][j] = w_highbits
+    return result
+
+def compute_r0(w_minus_cs2):
+    result = [[0] * len(w_minus_cs2[0]) for _ in range(len(w_minus_cs2))]
+    for i in range(len(w_minus_cs2)):
+        for j in range(len(w_minus_cs2[0])):
+            _,lowbits = decompose(w_minus_cs2[i][j], 2*gamma2,q)
+            result[i][j] = lowbits
+    return result
+
+
+def flatten_matrix(m):
+    flattened_list = []
+    for sublist in m:
+        for item in sublist:
+            flattened_list.append(item)
+    return flattened_list
+
+
+def compute_challenge(mu, w1, lamda_param, hash_function):
+    """
+    Computes the challenge c_hat = H(mu || w1, 2*lamda_param).
+    
+    Parameters:
+        mu (bytes): The hash of the message and key trace.
+        w1 (bytes): The coarse approximation of w.
+        lamda_param (int): The length of c_hat (2 * lamda_param).
+        hash_function: The hash function to use (default: SHA-512).
+    
+    Returns:
+        bytes: The challenge hash c_hat.
+    """
+    # Combine mu and w1 as byte strings
+    flat_w1 = flatten_matrix(w1)
+    w1_bytes = bytes(flat_w1)
+    input_data = mu + w1_bytes
+    
+    # Apply the hash function
+    c_hat = hash_function(input_data).digest(32)
+    
+    # Truncate to the desired domain size 2*lamda_param
+    max_bits = 2*lamda_param
+    c_hat_int = int.from_bytes(c_hat, byteorder="big") % max_bits
+    return c_hat_int.to_bytes((max_bits.bit_length() + 7) // 8, byteorder="big")
+
+
+def sample_in_ball(c_hat, n, tau):
+    """
+    Samples a polynomial c from the domain of c_hat with exactly tau non-zero coefficients.
+    
+    Parameters:
+        c_hat (bytes): The input challenge hash.
+        n (int): The degree of the polynomial (number of coefficients).
+        tau (int): The number of non-zero coefficients in the polynomial.
+    
+    Returns:
+        list[int]: The sampled polynomial with coefficients in {-1, 0, 1}.
+    """
+    random.seed(c_hat)  # Use c_hat as a seed for reproducibility
+    
+    # Initialize a polynomial of degree n with all coefficients set to 0
+    c = [0] * n
+    
+    # Randomly choose tau unique positions for non-zero coefficients
+    positions = random.sample(range(n), tau)
+    
+    # Assign either 1 or -1 to the selected positions
+    for pos in positions:
+        c[pos] = random.choice([-1, 1])
+    
+    return c
+
+
+def infinity_norm(vec):
+    """
+    Computes the infinity norm of a vector.
+    
+    Parameters:
+        vec (list[int]): The vector to compute the norm for.
+    
+    Returns:
+        int: The infinity norm (maximum absolute value of the coefficients).
+    """
+    res = []
+    for x in vec:
+        res.append(size_of_polynomial(q,x))
+    return max(abs(x) for x in res)
+
+
+def polynomial_addition_mods(P, Q, q):
+    result = []
+    for i in range(len(P)):
+        result.append(mods(q, (P[i] + Q[i])))
+        # print(f"P + Q = {(P[i] + Q[i])}\n\n")
+        # print(f"P + Q % q = {(P[i] + Q[i]) % q}\n\n")
+    return result
+
+def add_vector_to_vector_mods(V1, V2, q) :
+    result = []
+    for i in range(len(V1)):
+            result.append(
+                polynomial_addition_mods(V1[i], V2[i], q)
+            )
+    return result
+
+def compute_w1_prime(mu, w1_prime, output_bits):
+    """
+    Compute c_tilde = H(mu || w1_prime, 2 * lambda).
+
+    Parameters:
+    - mu: The message hash (bytes).
+    - w1_prime: The vector w1' (list of integers or bytes).
+    - output_bits: The desired output size in bits (2 * lambda).
+
+    Returns:
+    - c_tilde: The hash output as an integer truncated to output_bits.
+    """
+    flat_w1_prime = flatten_matrix(w1_prime)
+    w1_prime_bytes = bytes(flat_w1_prime)
+
+     # Concatenate mu and w1_prime
+    concatenated = mu + w1_prime_bytes
+    
+    # Hash using SHAKE-256 and truncate to the desired number of bits
+    shake = shake_256(concatenated)
+    c_tilde_bytes = shake.digest(output_bits // 8)  # Truncate to output_bits in bytes
+    
+    # Convert to an integer for further use
+    c_tilde = int.from_bytes(c_tilde_bytes, byteorder='big')
+    
+    return c_tilde    
+
+
+    
 
 def generate_keys(q, k, l, n, lambda_param):
     xi = generate_xi()
@@ -170,19 +383,77 @@ def generate_keys(q, k, l, n, lambda_param):
     trace_tr = compute_tr(p, t_vector, lambda_param)
     return p, t_vector, K, trace_tr, s1_vec, s2_vec
 
-def generate_signature(message, q, k, l, n, p, tr, K):
+
+
+def generate_signature(message, q, k, l, n, p, tr, K, s1_vector, s2_vector):
     matrix_A = expandA(q, k, l, n, p)
     mu = compute_mu(tr, message)
     deterministic_rnd = generate_deterministic_rnd()
     rho_second = compute_p_prime_prime(K, deterministic_rnd, mu)
     kappa = 0
     found = False
-    while not found:
-        y_vector = expand_mask_with_nonce(rho_second, kappa, l, gamma1)
-        w = multiply_matrix_by_vector(matrix_A, y_vector, q)
-        # Further steps for Dilithium signature generation would go here.
-        # For now, we just show that we've fixed the seeding/hashing.
-        # Implement the rest of the signature steps as per the Dilithium spec.
-        found = True  # Placeholder to prevent infinite loop
+    while(not found):
+        y_vector = expand_mask_with_nonce(rho_second,kappa,l,gamma1)
+        w =  multiply_matrix_by_vector(matrix_A,y_vector, q)
+        w1 = compute_w1(w)
+        c_hat = compute_challenge(mu,w1,lambda_p,shake_256)
+        c = sample_in_ball(c_hat, n, tau)
+        c_times_s1 = multiply_polynomial_with_vector(c,s1_vector,q)
+        z = add_vector_to_vector(y_vector, c_times_s1,q)
+        c_times_s2 = multiply_polynomial_with_vector(c,s2_vector,q)
+        w_minus_cs2 = compute_w_minus_cs2(w, c_times_s2, q)
+        r_zero = compute_r0(w_minus_cs2)
+        z_bound = gamma1 - Beta
+        r1_bound = gamma2 - Beta
+        z_norm = infinity_norm(z)
+        r0_norm = infinity_norm(r_zero)
+        is_z_valid = z_norm < z_bound
+        is_r0_valid = r0_norm < r1_bound
+        if(is_z_valid and is_r0_valid):
+            found = True
+        kappa+=l
+    return c_hat,z
 
-    return (y_vector, w)  # Placeholder return for demonstration
+
+def verify_signature(message, rho, z, t_vector, c_hat):
+    z_norm = infinity_norm(z)
+    z_bound = gamma1 - Beta
+    is_z_valid = z_norm < z_bound
+    if(not is_z_valid):
+        print("Signature is not valid")
+        return None
+    matrix_A = expandA(q, k, l, n, rho)
+    tr = compute_tr(rho,t_vector,lambda_p)
+    mu = compute_mu(tr,message)
+    c = sample_in_ball(c_hat,n,tau)
+    
+    A_times_z = multiply_matrix_by_vector(matrix_A,z,q)
+    c_times_t = multiply_polynomial_with_vector(c,t_vector,q)
+
+    Az_ct = compute_w_minus_cs2(A_times_z,c_times_t,q)
+    print(Az_ct)
+    w1_prime = compute_w1(Az_ct)
+    c_tilda_cmp = compute_w1_prime(mu, w1_prime, 2*lambda_p)
+    # print(f"c_tilda_cmp value is {type(c_tilda_cmp)}\n\n")
+    # c_hat_as_int = int.from_bytes(c_hat, byteorder='big')
+
+
+
+
+
+
+if __name__ == "__main__":
+    rho,t_vector,K,tr,s1,s2 = generate_keys(q,k,l,n,lambda_p)
+    # print(f"Rho = {rho}\n\n")
+    # print(f"t_vector = {t_vector}\n\n")
+    # print(f"K = {K}\n\n")
+    # print(f"tr = {tr}\n\n")
+    # print(f"s1 = {s1}\n\n")
+    # print(f"s2 = {s2}\n\n")
+    
+    
+    c_tilda, z_vector = generate_signature("hi",q,k,l,n,rho,tr,K,s1,s2)
+    # r1,r2 = decompose(5566,2*gamma2,q)
+    # print(f"Highbits = {r1}")
+    # print(f"Lowbits = {r2}")
+    verify_signature("hi",rho,z_vector,t_vector,c_tilda)
