@@ -344,6 +344,36 @@ def add_vector_to_vector_mods(V1, V2, q) :
             )
     return result
 
+def compute_w1_prime(mu, w1_prime, output_bits):
+    """
+    Compute c_tilde = H(mu || w1_prime, 2 * lambda).
+
+    Parameters:
+    - mu: The message hash (bytes).
+    - w1_prime: The vector w1' (list of integers or bytes).
+    - output_bits: The desired output size in bits (2 * lambda).
+
+    Returns:
+    - c_tilde: The hash output as an integer truncated to output_bits.
+    """
+    flat_w1_prime = flatten_matrix(w1_prime)
+    w1_prime_bytes = bytes(flat_w1_prime)
+
+     # Concatenate mu and w1_prime
+    concatenated = mu + w1_prime_bytes
+    
+    # Hash using SHAKE-256 and truncate to the desired number of bits
+    shake = shake_256(concatenated)
+    c_tilde_bytes = shake.digest(output_bits // 8)  # Truncate to output_bits in bytes
+    
+    # Convert to an integer for further use
+    c_tilde = int.from_bytes(c_tilde_bytes, byteorder='big')
+    
+    return c_tilde    
+
+
+    
+
 def generate_keys(q, k, l, n, lambda_param):
     xi = generate_xi()
     p, p_prime, K = compute_p_p_prime_K(xi)
@@ -351,25 +381,15 @@ def generate_keys(q, k, l, n, lambda_param):
     s1_vec, s2_vec = expandS(k,l,n,eta,p_prime)
     t_vector = compute_t_vector(A_matrix,s1_vec,s2_vec,q)
     trace_tr = compute_tr(p,t_vector,lambda_param)
-    print("=== Key Generation ===")
-    print("t_vector:", t_vector)
-    print("K:", K)
-    print("tr:", trace_tr)
-    print("s1:", s1_vec)
-    print("s2:", s2_vec)
-    print("===                === \n\n")
     return p, t_vector, K, trace_tr, s1_vec, s2_vec
 
 
 
 def generate_signature(message, q, k, l, n, p, tr, K, s1_vector, s2_vector):
     matrix_A = expandA(q, k, l, n, p)
-    print("A_matrix (Signing):", matrix_A) 
     mu = compute_mu(tr, message)
     deterministic_rnd = generate_deterministic_rnd()
     rho_second = compute_p_prime_prime(K, deterministic_rnd, mu)
-    print("=== Signing ===")
-    print("message:", message)
     kappa = 0
     found = False
     while(not found):
@@ -382,7 +402,6 @@ def generate_signature(message, q, k, l, n, p, tr, K, s1_vector, s2_vector):
         z = add_vector_to_vector(y_vector, c_times_s1,q)
         c_times_s2 = multiply_polynomial_with_vector(c,s2_vector,q)
         w_minus_cs2 = compute_w_minus_cs2(w, c_times_s2, q)
-        print("w_minus_cs2 (Signing):", w_minus_cs2)
         r_zero = compute_r0(w_minus_cs2)
         z_bound = gamma1 - Beta
         r1_bound = gamma2 - Beta
@@ -390,17 +409,9 @@ def generate_signature(message, q, k, l, n, p, tr, K, s1_vector, s2_vector):
         r0_norm = infinity_norm(r_zero)
         is_z_valid = z_norm < z_bound
         is_r0_valid = r0_norm < r1_bound
-        print("Attempt kappa:", kappa)
-        print("w:", w)
-        print("w1:", w1)
-        print()
         if(is_z_valid and is_r0_valid):
             found = True
         kappa+=l
-    print("=== Signature Found ===")
-    print("c_hat (final):", c_hat)
-    print("z (final):", z)
-    print("===                === \n\n")
     return c_hat,z
 
 
@@ -408,11 +419,6 @@ def verify_signature(message, rho, z, t_vector, c_hat):
     z_norm = infinity_norm(z)
     z_bound = gamma1 - Beta
     is_z_valid = z_norm < z_bound
-    print("=== Verification ===")
-    print("message:", message)
-    print("z:", z)
-    print("z_norm:", z_norm, "z_bound:", z_bound)
-    print("is_z_valid:", is_z_valid)
     if(not is_z_valid):
         print("Signature is not valid")
         return None
@@ -425,23 +431,12 @@ def verify_signature(message, rho, z, t_vector, c_hat):
     c_times_t = multiply_polynomial_with_vector(c,t_vector,q)
 
     Az_ct = compute_w_minus_cs2(A_times_z,c_times_t,q)
-    print("Az - ct (Verification):", Az_ct)
+    print(Az_ct)
     w1_prime = compute_w1(Az_ct)
-    c_tilda_cmp = compute_challenge(mu, w1_prime,lambda_p,shake_256)
-    print("t_vector:", t_vector)
-    print("c_hat (provided):", c_hat)
-    print("c (recomputed from c_hat):", c)
-    print("A_times_z:", A_times_z)
-    print("c_times_t:", c_times_t)
-    print("Az - ct:", Az_ct)
-    print("w1_prime:", w1_prime)
-    print("c_tilda_cmp:", c_tilda_cmp)
-    print("c hat is :", c_hat)
-    print("===                === \n\n")
-    if(c_tilda_cmp == c_hat):
-        print("The signature is valid")
-    else:
-        print("Unvalid signature")
+    c_tilda_cmp = compute_w1_prime(mu, w1_prime, 2*lambda_p)
+    # print(f"c_tilda_cmp value is {type(c_tilda_cmp)}\n\n")
+    # c_hat_as_int = int.from_bytes(c_hat, byteorder='big')
+
 
 
 
@@ -449,5 +444,16 @@ def verify_signature(message, rho, z, t_vector, c_hat):
 
 if __name__ == "__main__":
     rho,t_vector,K,tr,s1,s2 = generate_keys(q,k,l,n,lambda_p)
-    c_tilda, z_vector = generate_signature("Yesterday i went to college, but i hated it",q,k,l,n,rho,tr,K,s1,s2)
-    verify_signature("Yesterday i went to college, but i hated it",rho,z_vector,t_vector,c_tilda)
+    # print(f"Rho = {rho}\n\n")
+    # print(f"t_vector = {t_vector}\n\n")
+    # print(f"K = {K}\n\n")
+    # print(f"tr = {tr}\n\n")
+    # print(f"s1 = {s1}\n\n")
+    # print(f"s2 = {s2}\n\n")
+    
+    
+    c_tilda, z_vector = generate_signature("hi",q,k,l,n,rho,tr,K,s1,s2)
+    # r1,r2 = decompose(5566,2*gamma2,q)
+    # print(f"Highbits = {r1}")
+    # print(f"Lowbits = {r2}")
+    verify_signature("hi",rho,z_vector,t_vector,c_tilda)
