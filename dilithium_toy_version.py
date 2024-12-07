@@ -157,24 +157,38 @@ def are_low_bits_sufficiently_small(low_bits, threshold):
 
 def multiply_polynomial_with_vector(c, s1, q):
     """
-    Multiply a ternary polynomial c with a vector of polynomials s1.
+    Multiply polynomial c by each polynomial in s1 modulo x^n + 1.
 
     Args:
-        c (list): A single polynomial of size n (ternary coefficients: -1, 0, or +1).
-        s1 (list of lists): A vector of polynomials (each of size n).
-        q (int): Modulus for the operations.
+        c (list): A polynomial of size n with coefficients in {-1, 0, 1}.
+        s1 (list of lists): A vector of polynomials (each size n).
+        q (int): The modulus.
 
     Returns:
-        list of lists: A new vector of polynomials resulting from the multiplication.
+        list of lists: Resulting vector of polynomials after multiplication.
     """
+    n = len(c)
     result = []
     for poly in s1:
+        # Convolve c and poly
         convolved = np.convolve(c, poly)
-        # Reduce modulo q and truncate to original size
-        truncated = np.mod(convolved[:len(c)], q)
-        # Convert to pure Python list
+        
+        # Fold terms with power >= n back into the result
+        # convolved length can be up to 2*n - 1
+        for i in range(n, len(convolved)):
+            # x^n = -1, so coefficient at i folds into i-n with sign change
+            convolved[i-n] = convolved[i-n] - convolved[i]
+        
+        # Now we only care about the first n terms
+        truncated = convolved[:n]
+
+        # Reduce all coefficients modulo q
+        truncated = np.mod(truncated, q)
+
+        # Convert to a Python list
         result.append(truncated.tolist())
     return result
+
 
 def compute_w_minus_cs2(w, cs2_product, q):
     # Assuming w and cs2 are lists of lists of coefficients
