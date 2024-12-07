@@ -4,6 +4,7 @@ from hashlib import shake_256
 import secrets
 
 
+
 n = 4
 q = 2**14
 lambda_p = 256
@@ -15,82 +16,98 @@ tau = 4
 eta = 10
 Beta = tau*eta
 
+# Using secrects because appearently it's more secure and more commonly used for cryptography
 def generate_xi():
-    return secrets.token_bytes(32)  # 256-bit seed (xi)
+     return secrets.token_bytes(32) 
 
-def shake_hash(data: bytes, outlen_bits: int) -> bytes:
-    """Helper: SHAKE-256 based hashing to produce outlen_bits bits."""
-    return shake_256(data).digest(outlen_bits // 8)
 
-def compute_p_p_prime_K(xi: bytes):
+def hash(input_data, output_size_bits):
+    """Hash function with specified output size in bits."""
+    hash_bytes = shake_256(input_data).digest(output_size_bits // 8)
+    return int.from_bytes(hash_bytes, byteorder="big")
+
+
+def split_hash(hash_value, bit_sizes):
     """
-    Compute p, p', K from xi:
-    H(xi, 1024) -> 1024 bits = 128 bytes total
-    p: first 32 bytes (256 bits)
-    p_prime: next 64 bytes (512 bits)
-    K: last 32 bytes (256 bits)
+    Split a large hash value into multiple parts based on bit sizes.
+
+    Parameters:
+    - hash_value: The large hash value as an integer.
+    - bit_sizes: A list of sizes (in bits) for each part.
+
+    Returns:
+    - A tuple of integers, each representing a portion of the hash.
     """
-    full_hash = shake_hash(xi, 1024)
-    p = full_hash[0:32]
-    p_prime = full_hash[32:96]
-    K = full_hash[96:128]
+    parts = []
+    shift = sum(bit_sizes)  # Total size of the hash
+    for size in bit_sizes:
+        shift -= size
+        part = (hash_value >> shift) & ((1 << size) - 1)
+        parts.append(part)
+    return tuple(parts)
+
+def compute_p_p_prime_K(xi):
+    """
+    Compute (p, p', K) = H(ξ, 1024) and split the result.
+
+    Parameters:
+    - xi: The 256-bit seed (as bytes).
+
+    Returns:
+    - p: 256-bit integer
+    - p_prime: 512-bit integer
+    - K: 256-bit integer
+    """
+    # Step 1: Compute H(ξ, 1024)
+    hash_value = hash(xi, 1024)  # Produces a 1024-bit integer
+    
+    # Step 2: Split the hash into (p, p', K)
+    p, p_prime, K = split_hash(hash_value, [256, 512, 256])
+    
     return p, p_prime, K
 
-def sample_uniform_polynomial(q, n, seed: bytes, nonce: int) -> list:
-    """
-    Generate a polynomial with coefficients uniformly in [0, q-1] 
-    from a seed and a nonce using SHAKE-256.
-    """
-    # Encode nonce in 4 bytes
-    input_data = seed + nonce.to_bytes(4, 'little')
-    stream = shake_256(input_data)
-    poly = []
-    needed_bytes = (n * 2)  # since q = 2^14, we need 14 bits. 2 bytes can hold up to 16 bits.
-    rand_bytes = stream.digest(needed_bytes)
-    # Extract each coefficient
-    # q=2^14 means we just take 14 bits from each 16-bit chunk
-    # We'll just mod the 16-bit value by q
-    for i in range(n):
-        val = (rand_bytes[2*i] << 8) | rand_bytes[2*i+1]
-        val = val % q
-        poly.append(val)
-    return poly
 
-def sample_small_polynomial(n, eta, seed: bytes, nonce: int) -> list:
-    """
-    Generate a small polynomial with coefficients in [-eta, eta].
-    Use SHAKE to get random bytes and map them to the desired range.
-    """
-    input_data = seed + nonce.to_bytes(4, 'little')
-    stream = shake_256(input_data)
-    poly = []
-    # To get a coefficient in [-eta, eta], we can map bytes to an integer in that range.
-    # The range size is (2*eta + 1).
-    range_size = 2*eta + 1
-    # Each byte can be reduced mod (2*eta+1).
-    needed_bytes = n  # one byte per coefficient should be fine since eta small
-    rand_bytes = stream.digest(needed_bytes)
-    for i in range(n):
-        val = rand_bytes[i] % range_size
-        val = val - eta
-        poly.append(val)
-    return poly
+def generate_random_polynomial(q, n, seed):
+    """Generate a random polynomial modulo q using a seed."""
+    random.seed(seed)  # Setting the seed for reproducibility
+    return [random.randint(0, q-1) for _ in range(n)]
 
-def expandA(q, k, l, n, p: bytes):
+
+def generate_random_small_polynomial(n, eta, seed):
+    """Generate a random small polynomial between -eta and eta using a seed."""
+    random.seed(seed)  # Setting the seed for reproducibility
+    return [ randint(-eta, eta) for _ in range(n) ]
+    
+def generate_A(q, k, n):
+    return [[generate_random_polynomial(q,n) for _ in range(k)] for _ in range(k)]
+    
+
+def expandA(q, k, l, n, p):
+    """Generates the A matrix composed of random polynomial modulo q using a seed p."""
+    return [[generate_random_polynomial(q,n,p) for _ in range(l)] for _ in range(k)]
+
+
+def generate_small_polynomial_vector(k, n, eta, seed):
     """
-    Construct A matrix deterministically from seed p.
-    A is k x l, each entry is a polynomial of degree n.
-    We will use a simple counter for each polynomial.
+    Generate a vector of k small polynomials, each of degree n, with coefficients in [-eta, eta].
+    
+    Parameters:
+    - k: Number of polynomials in the vector.
+    - n: Degree of each polynomial.
+    - eta: Range for polynomial coefficients.
+    - seed: Seed to ensure deterministic generation.
+    
+    Returns:
+    - List of k polynomials.
     """
-    A = []
-    counter = 0
+    vector = []
     for i in range(k):
         # Derive a unique seed for each polynomial in the vector
         vector.append(generate_random_small_polynomial(n, eta, seed))
     return vector
 
 
-def expandS(k, l, n, eta, p_prime: bytes):
+def expandS(k, l, n, eta, p_prime):
     """
     Expand p_prime into two secret vectors s1 and s2.
     
@@ -117,15 +134,25 @@ def expandS(k, l, n, eta, p_prime: bytes):
     s2 = generate_small_polynomial_vector(k, n, eta, seed_s2)
     return s1, s2
 
+
 def compute_t_vector(A_matrix, s1_vector, s2_vector, q):
     """
-    Compute t = A*s1 + s2
+    Compute the public vector t.
+    
+    Parameters:
+    - A_matrix: The generated A matrix of polynomials.
+    - s1_vector: s1 vector of small polynomials.
+    - s2_vector: s2 vector of small polynomials.
+    - q: Range for polynomial coefficients.
+    
+    Returns:
+    - t: Public vector t.
     """
     a_times_s1 = multiply_matrix_by_vector(A_matrix, s1_vector, q)
     t = add_vector_to_vector(a_times_s1, s2_vector, q)
     return t
 
-def compute_tr(p_seed: bytes, t_vector, parameter_lambda):
+def compute_mu(tr, message):
     """
     Compute μ = H(tr || M, 512), where H is SHAKE-256.
     
@@ -174,7 +201,15 @@ def compute_tr(p_seed, t_vector, parameter_lambda):
 
 def compute_p_prime_prime(K, rnd, mu):
     """
-    p'' = H(K || rnd || mu, 512 bits)
+    Compute p'' = H(K || rnd || μ, 512) deterministically using SHAKE-256.
+
+    Parameters:
+    - K: Key (bytes).
+    - rnd: Random value (bytes, set to 256 zero bits for deterministic signing).
+    - mu: Message digest μ (bytes).
+
+    Returns:
+    - p'': 512-bit hash output as bytes.
     """
     # Concatenate K, rnd, and μ
     K_bytes = K.to_bytes(256 // 8, byteorder='big')
@@ -185,15 +220,30 @@ def compute_p_prime_prime(K, rnd, mu):
     
     return p_prime_prime
 
-def generate_deterministic_rnd():
-    return b'\x00' * 32
 
-def expand_mask_with_nonce(seed: bytes, kappa, l, gamma1):
+def generate_deterministic_rnd():
+    """Generate a deterministic rnd value for signing."""
+    return b'\x00' * 32  # 256 bits (32 bytes) of zeros
+
+def expand_mask_with_nonce(seed, kappa, l, gamma1):
     """
-    y vector with length l from seed, nonce=kappa.
+    Generate a vector y with length l using the seed and nonce.
+    
+    Parameters:
+    - seed: The seed (rho_0) as bytes.
+    - kappa: Nonce to ensure distinct randomness.
+    - l: Length of the vector y.
+    - q: Modulus to apply to each component of y.
+    
+    Returns:
+    - A list of l components polynomials of the vector y.
     """
-    input_data = seed + kappa.to_bytes(4, 'big')
-    stream = shake_256(input_data)
+    # Combine seed and nonce to make the input unique for each run
+    input_data = seed + kappa.to_bytes(4, 'big')  # Assuming kappa fits in 4 bytes
+    
+    # Use SHAKE-256 for flexible-length output
+    shake = shake_256(input_data)
+    
     y = []
     for _ in range(l):
         polynomial = []
@@ -393,6 +443,7 @@ def generate_signature(message, q, k, l, n, p, tr, K, s1_vector, s2_vector):
     kappa = 0
     found = False
     while(not found):
+        print("Attempt kappa:", kappa)
         y_vector = expand_mask_with_nonce(rho_second,kappa,l,gamma1)
         w =  multiply_matrix_by_vector(matrix_A,y_vector, q)
         w1 = compute_w1(w)
@@ -402,6 +453,7 @@ def generate_signature(message, q, k, l, n, p, tr, K, s1_vector, s2_vector):
         z = add_vector_to_vector(y_vector, c_times_s1,q)
         c_times_s2 = multiply_polynomial_with_vector(c,s2_vector,q)
         w_minus_cs2 = compute_w_minus_cs2(w, c_times_s2, q)
+        print("w_minus_cs2 (Signing):", w_minus_cs2)
         r_zero = compute_r0(w_minus_cs2)
         z_bound = gamma1 - Beta
         r1_bound = gamma2 - Beta
@@ -431,9 +483,13 @@ def verify_signature(message, rho, z, t_vector, c_hat):
     c_times_t = multiply_polynomial_with_vector(c,t_vector,q)
 
     Az_ct = compute_w_minus_cs2(A_times_z,c_times_t,q)
-    print(Az_ct)
+    print("Az - ct (Verification):", Az_ct)
     w1_prime = compute_w1(Az_ct)
-    c_tilda_cmp = compute_w1_prime(mu, w1_prime, 2*lambda_p)
+    c_tilda_cmp = compute_challenge(mu,w1_prime,lambda_p,shake_256)
+    if(c_tilda_cmp == c_hat):
+        print("Valid signature")
+    else:
+        print("Unvalid signature")
     # print(f"c_tilda_cmp value is {type(c_tilda_cmp)}\n\n")
     # c_hat_as_int = int.from_bytes(c_hat, byteorder='big')
 
@@ -457,3 +513,4 @@ if __name__ == "__main__":
     # print(f"Highbits = {r1}")
     # print(f"Lowbits = {r2}")
     verify_signature("hi",rho,z_vector,t_vector,c_tilda)
+
