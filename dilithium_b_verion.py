@@ -67,11 +67,13 @@ def compute_p_p_prime_K(xi):
     return p, p_prime, K
 
 
-def generate_random_polynomial(q, n, seed):
-    """Generate a random polynomial modulo q using a seed."""
-    random.seed(seed)  # Setting the seed for reproducibility
+def generate_random_polynomial(q, n, base_seed, i, j):
+    # Derive a unique seed for (i, j)
+    seed_input = base_seed.to_bytes((base_seed.bit_length() + 7)//8, byteorder='big') + i.to_bytes(2,'big') + j.to_bytes(2,'big')
+    derived_seed = int.from_bytes(shake_256(seed_input).digest(32), byteorder='big')
+    
+    random.seed(derived_seed)
     return [random.randint(0, q-1) for _ in range(n)]
-
 
 def generate_random_small_polynomial(n, eta, seed):
     """Generate a random small polynomial between -eta and eta using a seed."""
@@ -84,8 +86,14 @@ def generate_A(q, k, n):
 
 def expandA(q, k, l, n, p):
     """Generates the A matrix composed of random polynomial modulo q using a seed p."""
-    return [[generate_random_polynomial(q,n,p) for _ in range(l)] for _ in range(k)]
-
+    A = []
+    for i in range(k):
+        row = []
+        for j in range(l):
+            poly = generate_random_polynomial(q, n, p, i, j)
+            row.append(poly)
+        A.append(row)
+    return A
 
 def generate_small_polynomial_vector(k, n, eta, seed):
     """
@@ -437,6 +445,7 @@ def generate_keys(q, k, l, n, lambda_param):
 
 def generate_signature(message, q, k, l, n, p, tr, K, s1_vector, s2_vector):
     matrix_A = expandA(q, k, l, n, p)
+    print("A Matrix:", matrix_A)
     mu = compute_mu(tr, message)
     deterministic_rnd = generate_deterministic_rnd()
     rho_second = compute_p_prime_prime(K, deterministic_rnd, mu)
@@ -475,6 +484,7 @@ def verify_signature(message, rho, z, t_vector, c_hat):
         print("Signature is not valid")
         return None
     matrix_A = expandA(q, k, l, n, rho)
+    print("A Matrix in verify:", matrix_A)
     tr = compute_tr(rho,t_vector,lambda_p)
     mu = compute_mu(tr,message)
     c = sample_in_ball(c_hat,n,tau)
@@ -508,9 +518,9 @@ if __name__ == "__main__":
     # print(f"s2 = {s2}\n\n")
     
     
-    c_tilda, z_vector = generate_signature("hi",q,k,l,n,rho,tr,K,s1,s2)
+    c_tilda, z_vector = generate_signature("hi, i really like python",q,k,l,n,rho,tr,K,s1,s2)
     # r1,r2 = decompose(5566,2*gamma2,q)
     # print(f"Highbits = {r1}")
     # print(f"Lowbits = {r2}")
-    verify_signature("hi",rho,z_vector,t_vector,c_tilda)
+    verify_signature("hi, i really like python",rho,z_vector,t_vector,c_tilda)
 
