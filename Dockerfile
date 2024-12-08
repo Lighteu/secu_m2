@@ -21,4 +21,4 @@ WORKDIR /manim
 COPY . /manim
 
 # Set the default command to run when the container starts
-CMD ["manim", "-pql", "lattice_grid.py", "LatticeGrid"]
+CMD ["manim", "-pql", "kyber_visualization.py", "ShowKyberProcess"]

@@ -1,0 +1,398 @@
+\section{Pré-requis}
+\label{chap:Prerequis}
+ Afin de comprendre le fonctionnement de Kyber et Dilithium, il est essentiel de maîtriser certains concepts mathématiques fondamentaux. Ces prérequis incluent une compréhension des réseaux euclidiens, du problème du \emph{Module Learning With Errors} (MLWE), ainsi que d'autres notions liées à l'algèbre linéaire et à la théorie des nombres. La section suivante présentera ces concepts clés pour fournir une base solide avant d'aborder les détails techniques des algorithmes.
+    \subsection{Arithmétique Modulaire}
+
+En arithmétique modulaire, nous considérons l'ensemble des entiers naturels appartenant à l'anneau modulaire de module $q$. On note $\mathbb{Z}_q$ l'anneau modulaire avec $q \geq 2$, défini par:
+
+$$
+\mathbb{Z}_q = \{0, 1, 2, \dots, q-1\}.
+$$
+
+\textbf{Définitions :}
+
+\begin{enumerate}
+    \item Deux entiers relatifs $a$ et $b$ sont dits \emph{congrus modulo $q$} si leur différence est divisible par $q$, c'est-à-dire s'il existe un entier $k$ tel que $a = b + kq$. On note alors:
+
+            $$
+            a \equiv b \mod q.
+            $$
+
+    \item La notation $r = a \mod q$ signifie que $r$ est le reste obtenu après division euclidienne de $a$ par $q$. On a donc $0 \leq r \leq q-1$.
+
+    \item Les opérations arithmétiques (addition, soustraction, multiplication) sont toutes exécutées modulo $q$ dans $\mathbb{Z}_q$.
+
+\end{enumerate}
+
+
+\textbf{Exemple :}
+
+Prenons $q = 14$. L'anneau modulaire est alors:
+
+$$
+\mathbb{Z}_{14} = \{0, 1, 2, \dots, 13\}.
+$$
+
+Considérons les entiers $a = 29$ et $b = 1$.
+
+Calcul du reste de $a$ modulo $q$:
+
+$$
+29 \mod 14 = 1,
+$$
+
+car $29$ divisé par $14$ donne un quotient de $2$ et un reste de $1$. Ainsi, $29 \equiv 1 \mod 14$, ce qui signifie que $29$ et $1$ sont congrus modulo $14$.
+
+Opérations dans $\mathbb{Z}_{14}$:
+
+\begin{itemize}
+    \item \textbf{Addition} : $(9 + 8) \bmod 14 = 17 \bmod 14 = 3$.
+
+    \item \textbf{Soustraction} : $(5 - 12) \bmod 14 = -7 \bmod 14 = 7$ (puisque $-7 + 14 = 7$).
+
+    \item \textbf{Multiplication} : $(6 \times 5) \bmod 14 = 30 \bmod 14 = 2$.
+\end{itemize}
+
+
+% =======================================
+
+\subsection{Anneaux de Polynômes}
+
+En théorie algébrique, un \emph{anneau de polynômes} est un ensemble de polynômes à coefficients dans un anneau donné, ici l'anneau modulaire $\mathbb{Z}_q$. Nous considérons donc l'ensemble des polynômes à coefficients dans $\mathbb{Z}_q$, noté $\mathbb{Z}_q[x]$.
+
+Un polynôme $f(x)$ dans $\mathbb{Z}_q[x]$ est défini comme suit:
+
+\[
+f(x) = a_0 + a_1 x + a_2 x^2 + \cdots + a_n x^n,
+\]
+
+où $a_i \in \mathbb{Z}_q$ pour tout $i$, et $n$ est le degré du polynôme.
+
+Les opérations d'addition, de soustraction et de multiplication entre polynômes dans $\mathbb{Z}_q[x]$ sont effectuées en appliquant les opérations correspondantes sur les coefficients modulo $q$.
+
+\textbf{Exemple :}
+
+Prenons $q = 7$ et considérons les polynômes $f(x)$ et $g(x)$ de degré au plus $4$ dans $\mathbb{Z}_7[x]$ :
+
+\[
+f(x) = 3 + 2x + 6x^2 + x^3 + 5x^4, \quad g(x) = 5 + 4x + x^2 + 2x^3 + 6x^4.
+\]
+
+\textbf{Addition :}
+
+\[
+(f + g)(x) = 1 + 6x + 3x^3 + 4x^4.
+\]
+
+\textbf{Soustraction :}
+
+\[
+(f - g)(x) = 5 + 5x + 5x^2 + 6x^3 + 6x^4.
+\]
+
+\textbf{Multiplication :}
+
+\[
+(f \times g)(x) = 1 + x + 6x^2 + 2x^3 + x^4 + 3x^5 + x^6 + 2x^7 + 2x^8.
+\]
+
+
+% =======================
+
+\subsection{Anneau de Polynômes Quotient $R_q = \mathbb{Z}_q[x]/(x^n + 1)$}
+
+L'anneau $R_q$ est défini comme l'ensemble des polynômes à coefficients dans $\mathbb{Z}_q$, modulo le polynôme $x^n + 1$. Autrement dit, dans $R_q$, deux polynômes sont considérés égaux s'ils diffèrent d'un multiple de $x^n + 1$. Formellement, nous écrivons :
+
+\[
+R_q = \mathbb{Z}_q[x] / \langle x^n + 1 \rangle.
+\]
+
+Dans cet anneau, les opérations d'addition et de soustraction sont effectuées coefficient par coefficient, modulo $q$, comme précédemment. Cependant, lors de la multiplication, tout terme de degré supérieur ou égal à $n$ est réduit en utilisant la relation $x^n \equiv -1$.
+
+\textbf{Exemple :}
+
+Prenons $q = 7$, $n = 4$, et considérons les polynômes $f(x)$ et $g(x)$ dans $R_q$ :
+
+\[
+f(x) = 3 + 2x + 6x^2 + x^3, \quad g(x) = 5 + 4x + x^2 + 2x^3.
+\]
+
+\textbf{Addition :}
+
+\[
+(f + g)(x) = 1 + 6x + 0x^2 + 3x^3.
+\]
+
+\textbf{Soustraction :}
+
+\[
+(f - g)(x) = 5 + 5x + 5x^2 + 6x^3.
+\]
+
+\textbf{Multiplication :}
+
+La multiplication de $f(x)$ et $g(x)$ donne un polynôme initial de degré jusqu'à $6$. Pour rester dans $R_q$, nous réduisons les termes de degré supérieur ou égal à $n$ en utilisant la relation $x^n \equiv -1$ :
+
+\begin{itemize}
+    \item Les termes en $x^4$ sont remplacés par $-x^0$.
+    \item Les termes en $x^5$ sont remplacés par $-x^1$.
+    \item Les termes en $x^6$ sont remplacés par $-x^2$.
+\end{itemize}
+Après réduction, le résultat final est un polynôme de degré au plus $n - 1$ :
+
+\[
+(f \times g)(x) = 1 + x + 6x^2 + 2x^3.
+\]
+
+% ====================
+
+\subsection{Représentation des Polynômes en Informatique}
+
+En pratique, les polynômes sont représentés sur un ordinateur sous forme de vecteurs contenant leurs coefficients. Chaque élément du vecteur correspond au coefficient d'un monôme de degré spécifique, ce qui permet une manipulation efficace des polynômes lors des opérations arithmétiques.
+
+% ====================
+
+\subsection{Le Module \( R_q^k \)}
+
+Soit \( k \) un entier positif.
+
+Les éléments du module \( R_q^k \) sont des vecteurs de longueur \( k \) dont les composantes sont des polynômes dans \( R_q \). Formellement, un élément \( \mathbf{v} \) de \( R_q^k \) s'écrit :
+
+\[
+\mathbf{v} = \begin{pmatrix} v_1 \\ v_2 \\ \vdots \\ v_k \end{pmatrix},
+\]
+
+où chaque \( v_i \in R_q \).
+
+L'addition et la soustraction dans \( R_q^k \) se font composante par composante. Pour deux vecteurs \( \mathbf{u}, \mathbf{v} \in R_q^k \), on a :
+
+\[
+\mathbf{u} \pm \mathbf{v} = \begin{pmatrix} u_1 \pm v_1 \\ u_2 \pm v_2 \\ \vdots \\ u_k \pm v_k \end{pmatrix}.
+\]
+
+Le résultat est donc également un élément de \( R_q^k \).
+
+Le produit scalaire de deux vecteurs \( \mathbf{u}, \mathbf{v} \in R_q^k \) donne un polynôme dans \( R_q \), défini par :
+
+\[
+\langle \mathbf{u}, \mathbf{v} \rangle = \sum_{i=1}^k u_i v_i.
+\]
+
+Ici, la multiplication \( u_i v_i \) et l'addition sont effectuées dans \( R_q \).
+
+Tous les vecteurs dans \( R_q^k \) seront représentés sous forme de vecteurs colonnes pour faciliter les calculs et les notations.
+
+\textbf{Exemple :}
+
+Prenons \( q = 7 \), \( n = 4 \), et considérons les polynômes suivants dans \( R_q \) :
+
+\[
+a(x) = 2 + x + 3x^2 + 5x^3, \quad b(x) = 4 + 6x + x^2 + 2x^3.
+\]
+
+Construisons les vecteurs dans \( R_q^3 \) :
+
+\[
+\mathbf{u} = \begin{pmatrix} a(x) \\ b(x) \\ a(x) \end{pmatrix}, \quad \mathbf{v} = \begin{pmatrix} b(x) \\ a(x) \\ b(x) \end{pmatrix}.
+\]
+
+\emph{Addition :}
+
+\[
+\mathbf{u} + \mathbf{v} = \begin{pmatrix} a(x) + b(x) \\ b(x) + a(x) \\ a(x) + b(x) \end{pmatrix}.
+\]
+
+\emph{Produit Scalaire :}
+
+Le produit scalaire est donné par :
+
+\[
+\langle \mathbf{u}, \mathbf{v} \rangle = 3 a(x) b(x) \mod (x^n + 1, 7).
+\]
+
+Ce produit scalaire est un polynôme dans \( R_q \).
+
+% ======================================
+
+\subsection{Le Modulo Symétrique (\( \operatorname{mods} \))}
+
+Le modulo symétrique, noté \( \operatorname{mods} \), est une variante de l'opération modulo qui produit des restes répartis symétriquement autour de zéro. Cette opération est essentielle en cryptographie pour réduire les coefficients à leurs plus petites valeurs absolues possibles.
+
+\subsubsection{Cas où \( q \) est Impair}
+
+Lorsque \( q \) est impair, le modulo symétrique d'un entier \( a \) modulo \( q \) est défini par:
+
+\[
+a \operatorname{mods} q =
+\begin{cases}
+r & \text{si } r \leq \frac{q-1}{2}, \\
+r - q & \text{si } r > \frac{q-1}{2},
+\end{cases}
+\]
+
+où \( r = a \mod q \).
+
+\begin{minipage}{0.6\textwidth}
+\textbf{Exemple avec \( q = 17 \) :}
+
+Pour différents entiers \( a \), les résultats de \( a \operatorname{mods} 17 \) sont:
+
+\[
+\begin{aligned}
+20 \operatorname{mods} 17 &= 3, \\
+9 \operatorname{mods} 17 &= -8, \\
+-10 \operatorname{mods} 17 &= 7.
+\end{aligned}
+\]
+\end{minipage}
+\hfill
+\begin{minipage}{0.35\textwidth}
+\centering
+\includegraphics[width=\textwidth]{images/Symmetric_mod_odd.png}
+\end{minipage}
+
+\subsubsection{Cas où \( q \) est Pair}
+
+Lorsque \( q \) est pair, le modulo symétrique est défini par:
+
+\[
+a \operatorname{mods} q =
+\begin{cases}
+r & \text{si } r < \frac{q}{2}, \\
+r - q & \text{si } r \geq \frac{q}{2},
+\end{cases}
+\]
+
+où \( r = a \mod q \).
+
+\begin{minipage}{0.6\textwidth}
+\textbf{Exemple avec \( q = 18 \) :}
+
+Pour différents entiers \( a \), les résultats de \( a \operatorname{mods} 18 \) sont:
+
+\[
+\begin{aligned}
+25 \operatorname{mods} 18 &= 7, \\
+9 \operatorname{mods} 18 &= -9, \\
+-11 \operatorname{mods} 18 &= 7.
+\end{aligned}
+\]
+\end{minipage}
+\hfill
+\begin{minipage}{0.35\textwidth}
+\centering
+\includegraphics[width=\textwidth]{images/symmetric_mod_even.png}
+\end{minipage}
+
+
+% ======================
+
+\subsection{Norme \( L^\infty \) (La Taille)}
+
+Dans ce rapport, nous utiliserons le terme \emph{taille} pour désigner la \emph{Norme \( L^\infty \)} (\( \| \cdot \|_\infty \)). La Norme \( L^\infty \) est une mesure qui permet d'évaluer la plus grande valeur absolue des éléments d'un ensemble, qu'il s'agisse d'entiers, de polynômes ou de vecteurs.
+
+\subsubsection{Taille d'un Entier}
+
+Pour un entier \( a \in \mathbb{Z} \), la taille est simplement sa valeur absolue :
+
+\[
+\| a \|_\infty = |a|.
+\]
+
+Cette mesure reflète la distance de \( a \) à zéro sur la droite numérique.
+
+\subsubsection{Taille d'un Polynôme}
+
+Pour un polynôme \( f(x) \in R_q \) avec des coefficients \( f_i \in \mathbb{Z}_q \), la taille du polynôme est définie comme le maximum des tailles absolues de ses coefficients, après les avoir réduits modulo symétrique :
+
+\[
+\| f(x) \|_\infty = \max_{0 \leq i < n} | f_i \operatorname{mods} q |.
+\]
+
+Cette mesure permet d'évaluer la plus grande amplitude des coefficients du polynôme, ce qui est crucial pour analyser la sécurité et l'efficacité des algorithmes cryptographiques.
+
+\textbf{Exemple :}
+
+Considérons le polynôme \( f(x) = 8 - 5x + 12x^2 - 9x^3 \) dans \( R_{17} \).
+
+1. **Réduction des coefficients modulo symétrique :**
+
+   \[
+   \begin{aligned}
+   8 \operatorname{mods} 17 &= 8 \quad (\text{puisque } 8 \leq 8), \\
+   -5 \operatorname{mods} 17 &= (-5) \mod 17 = 12, \quad \text{puis } 12 - 17 = -5 \quad (\text{si } 12 \geq 8.5), \\
+   12 \operatorname{mods} 17 &= 12 - 17 = -5 \quad (\text{puisque } 12 \geq 8.5), \\
+   -9 \operatorname{mods} 17 &= (-9) \mod 17 = 8 \quad (\text{puisque } 8 \leq 8).
+   \end{aligned}
+   \]
+
+2. **Calcul de la taille du polynôme :**
+
+   \[
+   \| f(x) \|_\infty = \max \left( |8|, |-5|, |-5|, |8| \right) = 8.
+   \]
+
+Ainsi, la taille du polynôme \( f(x) \) est \( 8 \).
+
+% =============================
+
+\subsection{Petits Polynômes}
+
+Un polynôme dans \( R_q \) est dit \emph{petit} si sa taille est petite, c'est-à-dire si les valeurs absolues de ses coefficients sont faibles.
+
+Nous introduisons un entier \( \eta \) tel que \( \eta \ll \dfrac{q}{2} \). Nous définissons alors l'ensemble \( S_\eta \) comme l'ensemble des polynômes \( f(x) \in R_q \) dont la taille est inférieure à \( \eta \):
+
+\[
+S_\eta = \{ f(x) \in R_q \mid \| f(x) \|_\infty \leq \eta \}.
+\]
+
+Cela signifie que tous les coefficients de ces polynômes satisfont \( |f_i| \leq \eta \).
+
+\textbf{Exemple :}
+
+Prenons \( q = 17 \) et choisissons \( \eta = 3 \). Considérons le polynôme \( f(x) = 2 - x + 3x^2 - 2x^3 \) dans \( R_{17} \).
+
+- Les coefficients de \( f(x) \) sont \( [2, -1, 3, -2] \).
+- Les valeurs absolues de ces coefficients sont \( [2, 1, 3, 2] \).
+- Comme \( |f_i| \leq \eta \) pour tous les \( i \), avec \( \eta = 3 \), le polynôme \( f(x) \) appartient à \( S_3 \).
+
+Ainsi, \( f(x) \) est un \emph{petit polynôme} dans \( R_{17} \).
+
+\textbf{Note : } le produit de deux petit polynôme est aussi considéré comme petit polynôme
+
+% ============================
+
+\subsection{Problèmes MLWE et D-MLWE}
+
+Pour comprendre le fondement mathématique sur lequel reposent Kyber et Dilithium, il est essentiel de présenter les problèmes du \emph{Module Learning With Errors} (MLWE) et du \emph{Decisional Module Learning With Errors} (D-MLWE). Ces problèmes sont considérés comme difficiles à résoudre, même pour des ordinateurs quantiques, et forment la base de la sécurité de ces algorithmes.
+
+Soient les paramètres suivants :
+
+- \( q \) : un nombre premier servant de module pour les opérations dans \( R_q \).
+- \( n \) : un entier positif représentant le degré des polynômes dans \( R_q \).
+- \( k \) et \( l \) : deux entiers positifs définissant les dimensions des matrices et vecteurs.
+- \( \eta_1 \) et \( \eta_2 \) : deux petits entiers tels que \( \eta_1, \eta_2 \ll \dfrac{q}{2} \).
+
+\subsubsection{Problème MLWE}
+
+Le problème MLWE consiste, étant donné une matrice aléatoire \( \mathbf{A} \in R_q^{k \times l} \) et un vecteur \( \mathbf{t} \in R_q^k \), à retrouver le vecteur secret \( \mathbf{s} \in S_{\eta_1}^l \) tel que :
+
+\[
+\mathbf{t} = \mathbf{A} \mathbf{s} + \mathbf{e},
+\]
+
+où \( \mathbf{e} \in S_{\eta_2}^k \) est un vecteur d'erreurs composé de petits polynômes.
+
+La difficulté du problème MLWE réside dans le fait que l'ajout du vecteur d'erreurs \( \mathbf{e} \) masque suffisamment le produit \( \mathbf{A} \mathbf{s} \), rendant la récupération de \( \mathbf{s} \) à partir de \( \mathbf{t} \) extrêmement difficile.
+
+\subsubsection{Problème D-MLWE}
+
+Le problème D-MLWE (Decisional MLWE) est la version décisionnelle du problème MLWE. Il s'agit de distinguer entre deux distributions de vecteurs \( \mathbf{t} \) :
+
+- **Distribution réelle** : les paires \((\mathbf{A}, \mathbf{t})\) où \( \mathbf{t} = \mathbf{A} \mathbf{s} + \mathbf{e} \) avec \( \mathbf{s} \in S_{\eta_1}^l \) et \( \mathbf{e} \in S_{\eta_2}^k \).
+- **Distribution uniforme** : les paires \((\mathbf{A}, \mathbf{t})\) où \( \mathbf{t} \) est choisi uniformément au hasard dans \( R_q^k \), indépendamment de \( \mathbf{A} \).
+
+Le problème D-MLWE consiste à déterminer si une paire donnée \((\mathbf{A}, \mathbf{t})\) provient de la distribution réelle ou de la distribution uniforme. La difficulté de ce problème repose sur l'indistinguabilité statistique entre les deux distributions lorsque les paramètres sont correctement choisis.
+
+
+La sécurité des algorithmes Kyber et Dilithium repose sur l'hypothèse que résoudre ces problèmes est intractable, même avec les capacités de calcul offertes par les ordinateurs quantiques. En choisissant soigneusement les paramètres \( q, n, k, l, \eta_1, \eta_2 \), on s'assure que les distributions associées aux problèmes MLWE et D-MLWE sont suffisamment complexes pour garantir un haut niveau de sécurité.

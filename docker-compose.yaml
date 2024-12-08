@@ -6,4 +6,4 @@ services:
     volumes:
       - .:/manim
     working_dir: /manim
-    command: manim -ql lattice_grid.py LatticeGrid
+    command: manim -ql kyber_visualization.py ShowKyberProcess

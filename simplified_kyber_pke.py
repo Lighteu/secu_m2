@@ -248,8 +248,8 @@ def generate_small_polynomial_vector(k, n, eta1):
 
 def gen_keys():
     q = 3329
-    n = 256
-    k = 3
+    n = 4
+    k = 2
     eta1 = 2
     eta2 = 2
     A = generate_A(q=q,k=k, n=n)
@@ -260,8 +260,8 @@ def gen_keys():
 
 def encrypt(m, pub):
     q = 3329
-    n = 256
-    k = 3
+    n = 4
+    k = 2
     eta1 = 2
     eta2 = 2
     A = pub[0]
@@ -275,7 +275,7 @@ def encrypt(m, pub):
     t_transpose_times_r = multiply_vector_by_vector(t_transpose, r, q)
     t_transpose_times_r_plus_e2 = polynomial_addition(t_transpose_times_r, e2, q)
     v = compute_v(t_transpose_times_r_plus_e2, m, q)
-    
+    print(v)
     return (u,v)
 
 def decrypt(cipher, prv) :
@@ -322,7 +322,7 @@ def compute_v(t_r_e2, message, q):
 
 def demonstration():
     pub, prv = gen_keys()
-    message = "Hello world!"
+    message = "H"
     binary_message = string_to_binary_vector(message)
     cipher = encrypt(binary_message, pub)
     decrypted_binary = decrypt(cipher, prv)
