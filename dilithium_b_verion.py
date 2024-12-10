@@ -6,8 +6,8 @@ import secrets
 
 
 n = 4
-q = 2**14
-lambda_p = 256
+q = 2**7
+lambda_p = 16
 k = 3
 l = 2
 gamma1 = 2**10
@@ -439,6 +439,7 @@ def generate_keys(q, k, l, n, lambda_param):
     s1_vec, s2_vec = expandS(k,l,n,eta,p_prime)
     t_vector = compute_t_vector(A_matrix,s1_vec,s2_vec,q)
     trace_tr = compute_tr(p,t_vector,lambda_param)
+    print(len([hex(x).split('x')[-1] for x in trace_tr]))
     return p, t_vector, K, trace_tr, s1_vec, s2_vec
 
 

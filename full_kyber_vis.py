@@ -361,7 +361,7 @@ class ShowKyberProcess(Scene):
         # Title
         title = Text("Kyber Key Generation, Encryption & Decryption", font_size=36)
         self.play(FadeIn(title))
-        self.wait(2)
+        self.wait(1)
         self.play(FadeOut(title))
 
         # ---------------------------------
@@ -369,7 +369,7 @@ class ShowKyberProcess(Scene):
         # ---------------------------------
         keygen_title = Text("Key Generation", font_size=32)
         self.play(FadeIn(keygen_title))
-        self.wait(2)
+        self.wait(1)
         self.play(keygen_title.animate.to_edge(UP))
 
         # Show parameters and keep them until keygen step done
@@ -377,18 +377,18 @@ class ShowKyberProcess(Scene):
             r"q=", str(q), r", n=", str(n), r", k=", str(k), r", \eta_1=", str(eta1), r", \eta_2=", str(eta2), r", d_u=", str(du), r", d_v=", str(dv)
         ).scale(0.5)
         self.play(FadeIn(param_text))
-        self.wait(2)
+        self.wait(1)
         
         self.play(param_text.animate.move_to([0, 2.5, 0]))
-        self.wait(2)
+        self.wait(1)
 
         row_text = MathTex(
             r"\rho = ", row
         ).scale(0.5)
         self.play(FadeIn(row_text))
-        self.wait(2)
+        self.wait(1)
         self.play(row_text.animate.move_to([0,2,0]))
-        self.wait(2)
+        self.wait(1)
         
         matrix_str = r"A = \begin{pmatrix}"
         for i, row in enumerate(A_demo):
@@ -407,11 +407,11 @@ class ShowKyberProcess(Scene):
 
         # Fade in the matrix
         self.play(FadeIn(A_mat))
-        self.wait(2)
+        self.wait(1)
 
         # Animate it moving to the left by 3.5 units
         self.play(A_mat.animate.shift(LEFT * 3.5))
-        self.wait(2)
+        self.wait(1)
 
 
         # Show s as a MathTex column vector
@@ -421,7 +421,7 @@ class ShowKyberProcess(Scene):
         s_group = MathTex(s_str).scale(0.4)
         s_group.next_to(A_mat, RIGHT, buff=1)
         self.play(FadeIn(s_group))
-        self.wait(2)
+        self.wait(1)
 
         # Show e as a MathTex column vector
         e_str = r"\mathbf{e} = \begin{pmatrix}"
@@ -430,13 +430,13 @@ class ShowKyberProcess(Scene):
         e_group = MathTex(e_str).scale(0.4)
         e_group.next_to(s_group, RIGHT, buff=1)
         self.play(FadeIn(e_group))
-        self.wait(2)
+        self.wait(1)
 
         # Show t = A s + e
         t_expression = MathTex(r"\mathbf{t} = A\mathbf{s} + \mathbf{e}").scale(1)
         t_expression.next_to(A_mat, DOWN, buff=1)
         self.play(FadeIn(t_expression))
-        self.wait(2)
+        self.wait(1)
 
         # Show t as a MathTex column vector
         t_str = r"\mathbf{t} = \begin{pmatrix}"
@@ -445,7 +445,7 @@ class ShowKyberProcess(Scene):
         t_group = MathTex(t_str).scale(1)
         t_group.next_to(t_expression, RIGHT, buff=0.5)
         self.play(FadeIn(t_group))
-        self.wait(2)
+        self.wait(1)
 
 
         # Now that key generation step is complete, remove all keygen elements
@@ -471,7 +471,7 @@ class ShowKyberProcess(Scene):
         # ---------------------------------
         enc_title = Text("Encryption", font_size=32)
         self.play(FadeIn(enc_title))
-        self.wait(2)
+        self.wait(1)
         self.play(enc_title.animate.to_edge(UP))
         
         binary_str = "m = " + "".join(str(bit) for bit in m_bin)
@@ -484,7 +484,7 @@ class ShowKyberProcess(Scene):
         msg_group.next_to(enc_title, DOWN, buff=1)
 
         self.play(FadeIn(msg_group))
-        self.wait(2)
+        self.wait(1)
 
         # Show r, e1, e2 and keep them until done showing u and v
         r_tex = VGroup(*[MathTex(poly_to_tex(rp)).scale(0.5) for rp in r]).arrange(DOWN)
@@ -504,33 +504,33 @@ class ShowKyberProcess(Scene):
         e2_str = MathTex(r"\mathbf{e_2} = " + poly_to_tex(e2)).scale(0.5)
         e2_str.next_to(e1_group, RIGHT, buff=1)
         self.play(FadeIn(e2_str))
-        self.wait(2)
+        self.wait(1)
 
         # Show u = A^T r + e1
         u_expression = MathTex(r"\mathbf{u} = A^T \mathbf{r} + \mathbf{e_1}").scale(0.5)
         u_expression.next_to(r_group, DOWN, buff=1)
         self.play(FadeIn(u_expression))
-        self.wait(2)
+        self.wait(1)
 
         u_tex = VGroup(*[MathTex(poly_to_tex(up)).scale(0.5) for up in u]).arrange(DOWN)
         u_label = MathTex(r"\mathbf{u} =").scale(0.5)
         u_group = VGroup(u_label, u_tex).arrange(RIGHT)
         u_group.next_to(u_expression, RIGHT, buff=0.5)
         self.play(FadeIn(u_group))
-        self.wait(2)
+        self.wait(1)
 
         # Show v = t^T r + e2 + (q/2)*m
         v_expression = MathTex(r"\mathbf{v} = \mathbf{t}^T\mathbf{r} + \mathbf{e_2} + \lceil q/2 \rfloor \mathbf{m}").scale(0.5)
         v_expression.next_to(u_expression, DOWN, buff=1)
         self.play(FadeIn(v_expression))
-        self.wait(2)
+        self.wait(1)
 
         v_tex = MathTex(poly_to_tex(v)).scale(0.5)
         v_label = MathTex(r"\mathbf{v} =").scale(0.5)
         v_group = VGroup(v_label, v_tex).arrange(RIGHT)
         v_group.next_to(v_expression, RIGHT, buff=0.5)
         self.play(FadeIn(v_group))
-        self.wait(2)
+        self.wait(1)
 
         # Now remove all encryption elements
         self.play(
@@ -559,7 +559,7 @@ class ShowKyberProcess(Scene):
         c1_group = VGroup(c1_label, c1_tex).arrange(RIGHT)
         c1_group.next_to(arrow1, DOWN, buff=0.5)
         self.play(FadeIn(c1_group))
-        self.wait(2)
+        self.wait(1)
         
         self.play(GrowArrow(arrow2))
         c2_tex = MathTex(poly_to_tex(c2)).scale(0.5)
@@ -567,7 +567,7 @@ class ShowKyberProcess(Scene):
         c2_group = VGroup(c2_label, c2_tex).arrange(RIGHT)
         c2_group.next_to(arrow2, DOWN, buff=0.5)
         self.play(FadeIn(c2_group))
-        self.wait(2)
+        self.wait(1)
         
         self.play(
             FadeOut(u_group),
@@ -588,7 +588,7 @@ class ShowKyberProcess(Scene):
         # ---------------------------------
         dec_title = Text("Decryption", font_size=32)
         self.play(FadeIn(dec_title))
-        self.wait(2)
+        self.wait(1)
         self.play(FadeOut(dec_title))
         self.wait(1)
         
@@ -609,7 +609,7 @@ class ShowKyberProcess(Scene):
         u_prime_group = VGroup(u_prime_label, u_prime_tex).arrange(RIGHT)
         u_prime_group.next_to(arrow1, DOWN, buff=0.5)
         self.play(FadeIn(u_prime_group))
-        self.wait(2)
+        self.wait(1)
 
         self.play(GrowArrow(arrow2))
         v_prime_tex = MathTex(poly_to_tex(v_prime)).scale(0.5)
@@ -617,7 +617,7 @@ class ShowKyberProcess(Scene):
         v_prime_group = VGroup(v_prime_label, v_prime_tex).arrange(RIGHT)
         v_prime_group.next_to(arrow2, DOWN, buff=0.5)
         self.play(FadeIn(v_prime_group))
-        self.wait(2)
+        self.wait(1)
         
         self.play(
             FadeOut(u_prime_group),
@@ -631,13 +631,13 @@ class ShowKyberProcess(Scene):
         # Show the final equation for decryption and final message
         expression = MathTex(r"\mathbf{m} = \text{Round}_q(\mathbf{v\prime} - \mathbf{s}^T \mathbf{u\prime})").scale(0.5)
         self.play(FadeIn(expression))
-        self.wait(2)
+        self.wait(1)
 
         bit_str = "".join(str(b) for b in decrypted_bin)
         bits_text = MathTex(r"\mathbf{m} = " + bit_str).scale(0.5)
         bits_text.next_to(expression, DOWN, buff=0.5)
         self.play(FadeIn(bits_text))
-        self.wait(2)
+        self.wait(1)
 
         # Remove decryption elements
         self.play(FadeOut(expression), FadeOut(bits_text), FadeOut(dec_title))

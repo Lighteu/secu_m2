@@ -396,3 +396,15 @@ Le problème D-MLWE consiste à déterminer si une paire donnée \((\mathbf{A}, 
 
 
 La sécurité des algorithmes Kyber et Dilithium repose sur l'hypothèse que résoudre ces problèmes est intractable, même avec les capacités de calcul offertes par les ordinateurs quantiques. En choisissant soigneusement les paramètres \( q, n, k, l, \eta_1, \eta_2 \), on s'assure que les distributions associées aux problèmes MLWE et D-MLWE sont suffisamment complexes pour garantir un haut niveau de sécurité.
+
+
+\subsection{Schéma complet de Kyber-PKE}
+\paragraph En introduisant ces amélioration on retrouve donc le schéma complet de Kyber-PKE en changeant les étapes suivantes : 
+
+\subsubsection{Génération de clés}
+\begin{itemize}
+    \item Nous séléctionons aléatoirement $\rho = \{0,1\}^n$ avec ce même $\rho$ nous alons utilisé une fonction de hashage afin de générer chaque élément de la matrice $A \in_R R_q^{k\ times k}$
+    \item les éléments $s$ et $e$ seront généré aleatoirement en suivant une $\mathbf{CBD}$
+\end{itemize}
+
+la clé publique est donc $(\rho, t)$ au lieu de $(A,t)$

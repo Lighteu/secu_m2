@@ -1,5 +1,4 @@
 from random import randint
-from icecream import ic
 
 def format_polynomial(coefficients):
     """

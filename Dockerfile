@@ -21,4 +21,4 @@ WORKDIR /manim
 COPY . /manim
 
 # Set the default command to run when the container starts
-CMD ["manim", "-pql", "full_kyber_vis.py", "ShowKyberProcess"]
+CMD ["manim", "-pql", "dilithium_vis.py", "ShowDiliProcess"]

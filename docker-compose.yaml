@@ -6,4 +6,4 @@ services:
     volumes:
       - .:/manim
     working_dir: /manim
-    command: manim -ql full_kyber_vis.py ShowKyberProcess
+    command: manim -ql dilithium_vis.py ShowDiliProcess
